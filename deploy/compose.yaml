@@ -1,0 +1,167 @@
+name: basement-cloud
+x-nextcloud: &nextcloud
+  image: ${NEXTCLOUD_IMAGE:?Pinned image required}
+  restart: "no"
+  security_opt: [no-new-privileges:true]
+  environment: &nextcloud-env
+    POSTGRES_HOST: db
+    POSTGRES_DB: cloud
+    POSTGRES_USER: cloud
+    POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    REDIS_HOST: redis
+    REDIS_HOST_PASSWORD_FILE: /run/secrets/redis_password
+    NEXTCLOUD_ADMIN_USER: ${CLOUD_USER:?Set owner name}
+    NEXTCLOUD_ADMIN_PASSWORD_FILE: /run/secrets/admin_password
+    NEXTCLOUD_DATA_DIR: /data
+    NEXTCLOUD_TRUSTED_DOMAINS: ${CLOUD_HOST:?Set hostname}
+    OVERWRITEHOST: ${CLOUD_HOST}
+    OVERWRITEPROTOCOL: https
+    OVERWRITECLIURL: https://${CLOUD_HOST}
+    PHP_MEMORY_LIMIT: 512M
+    PHP_UPLOAD_LIMIT: 100G
+    PHP_OPCACHE_MEMORY_CONSUMPTION: 192
+    NEXTCLOUD_INIT_HTACCESS: "true"
+    NEXTCLOUD_INIT_LOCK: "true"
+    NO_PROXY: localhost,127.0.0.1,app,db,redis,web
+    no_proxy: localhost,127.0.0.1,app,db,redis,web
+  volumes: &nextcloud-volumes
+    - type: bind
+      source: ${CLOUD_STATE}/nextcloud
+      target: /var/www/html
+      bind: {create_host_path: false}
+    - type: bind
+      source: ${CLOUD_PRIMARY}/data
+      target: /data
+      bind: {create_host_path: false}
+    - type: bind
+      source: ${CLOUD_PRIMARY}/tmp/php
+      target: /upload-tmp
+      bind: {create_host_path: false}
+    - type: bind
+      source: ${CLOUD_STATE}/runtime/deploy/php.ini
+      target: /usr/local/etc/php/conf.d/zz-basement.ini
+      read_only: true
+      bind: {create_host_path: false}
+    - type: bind
+      source: ${CLOUD_STATE}/runtime/deploy/fpm.conf
+      target: /usr/local/etc/php-fpm.d/zz-basement.conf
+      read_only: true
+      bind: {create_host_path: false}
+    - type: bind
+      source: ${CLOUD_STATE}/runtime/deploy/cloud.config.php
+      target: /run/cloud-config/basement.config.php
+      read_only: true
+      bind: {create_host_path: false}
+    - type: bind
+      source: ${CLOUD_STATE}/runtime/deploy/pre-install.sh
+      target: /docker-entrypoint-hooks.d/pre-installation/10-basement.sh
+      read_only: true
+      bind: {create_host_path: false}
+  secrets: [db_password, redis_password, admin_password]
+  tmpfs: ["/tmp:size=64m,mode=1777"]
+  networks: [internal, outbound]
+  pids_limit: 128
+services:
+  db:
+    image: ${POSTGRES_IMAGE:?Pinned image required}
+    restart: "no"
+    security_opt: [no-new-privileges:true]
+    environment:
+      POSTGRES_USER: cloud
+      POSTGRES_DB: cloud
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes:
+      - type: bind
+        source: ${CLOUD_STATE}/postgres
+        target: /var/lib/postgresql/data
+        bind: {create_host_path: false}
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U cloud -d cloud"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [internal]
+    mem_limit: 2g
+    cpus: 1.0
+    pids_limit: 128
+  redis:
+    image: ${REDIS_IMAGE:?Pinned image required}
+    restart: "no"
+    security_opt: [no-new-privileges:true]
+    command: [redis-server, /etc/redis/redis.conf]
+    secrets: [redis_auth]
+    volumes:
+      - type: bind
+        source: ${CLOUD_STATE}/runtime/deploy/redis.conf
+        target: /etc/redis/redis.conf
+        read_only: true
+        bind: {create_host_path: false}
+    networks: [internal]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 32
+  app:
+    <<: *nextcloud
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+    healthcheck:
+      test: [CMD-SHELL, "grep -q php-fpm /proc/1/comm"]
+      interval: 10s
+      timeout: 5s
+      retries: 90
+      start_period: 60s
+    mem_limit: 4g
+    cpus: 2.0
+  web:
+    image: ${NGINX_IMAGE:?Pinned image required}
+    restart: "no"
+    security_opt: [no-new-privileges:true]
+    ports: ["127.0.0.1:${CLOUD_HTTP_PORT:-8081}:80"]
+    environment:
+      NO_PROXY: localhost,127.0.0.1,app,db,redis,web
+      no_proxy: localhost,127.0.0.1,app,db,redis,web
+    volumes:
+      - type: bind
+        source: ${CLOUD_STATE}/nextcloud
+        target: /var/www/html
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${CLOUD_PRIMARY}/tmp/nginx
+        target: /upload-tmp
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${CLOUD_STATE}/runtime/deploy/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind: {create_host_path: false}
+    depends_on:
+      app: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, "HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= wget -qO- http://127.0.0.1/status.php | grep -q '\"installed\":true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 90
+      start_period: 60s
+    networks: [internal, outbound]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 32
+  cron:
+    <<: *nextcloud
+    entrypoint: /cron.sh
+    depends_on:
+      app: {condition: service_healthy}
+    mem_limit: 1g
+    cpus: 0.5
+    pids_limit: 64
+secrets:
+  db_password: {file: "${CLOUD_STATE}/secrets/db_password"}
+  redis_password: {file: "${CLOUD_STATE}/secrets/redis_password"}
+  redis_auth: {file: "${CLOUD_STATE}/secrets/redis_auth"}
+  admin_password: {file: "${CLOUD_STATE}/secrets/admin_password"}
+networks:
+  internal: {internal: true}
+  outbound: {}

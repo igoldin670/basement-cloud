@@ -1,0 +1,16 @@
+# Verification
+
+- **29 unit/safety tests passed** with Python 3.12 and uv. Coverage includes UUID and mount validation, rejecting the OS and same physical disks, missing-primary recovery reads, symlink and no-overwrite protection, conservative quotas, template and secret modes, preserved album bytes, interruption recovery, locks, restore target restrictions, private Tailscale routing, and explicit image pins.
+- **Six Docker integration scenarios passed** with temporary synthetic storage: authenticated byte-identical upload/download and anonymous rejection; chunked upload resuming across a consistent encrypted backup; a failed backup preserving the previous snapshot and returning a healthy service; old-file restoration after a live overwrite plus full repository verification; a completely fresh PostgreSQL/Nextcloud instance restoring the owner account, metadata, and original download; and full-data verification rejecting a deliberately corrupted temporary pack.
+- The complete database recovery includes PostgreSQL global roles, role password hashes, database ownership, and ACLs. This matters because initial Nextcloud installation creates an `oc_admin` role in addition to the Docker bootstrap user. The successful recovery used a fresh bootstrap `postgres` role, imported saved roles first, then used `pg_restore --create` with ownership preserved.
+- Docker Compose configuration validation passed. Actual PHP/Redis configuration and disk-backed upload temporary paths were checked in the installed test application. Protected config/data URLs returned 404; WebDAV requests without credentials returned 401. Relative DAV redirects retained the requested host port.
+- `systemd-analyze calendar` accepted the New York daily/weekly schedules, including the daylight-saving transition. No system services were installed on the real server.
+- All integration containers, test data, and corrupted test repositories for the successful run were removed. Tests did not use physical drives, existing photos, or the user's server. The GFPicturebook working tree stayed unchanged.
+
+## Limits
+
+Physical drive identities/failures still need validation by running the read-only preflight on the real Linux server. Unit tests mock topology; the integration harness has in-process mocks for temporary mount identities and the managed workspace's smaller capacity. The production CLI has no bypass for UUID checks.
+
+The managed Docker daemon uses a space-heavy VFS driver. Complete integration used an equivalent flattened copy of the exact pinned Nextcloud FPM filesystem with its entrypoint, environment, working directory, volume, port, and stop-signal configuration preserved. The production `images.json` still references the original official digest. PostgreSQL, Redis, Nginx, and Restic used their pinned official images. The original FPM image also completed cold installation before the image-format workaround.
+
+A physical iPhone, Tailscale Serve on the user's server, native iOS background scheduling, HEIC/Live Photo upload settings, and recovery after loss of real hardware were not exercised in this environment. The README includes the on-device acceptance steps. This phase stores photos/videos and files; full-device iPhone backups remain deferred.

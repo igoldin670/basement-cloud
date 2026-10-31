@@ -1,0 +1,11 @@
+{
+  "system_uuid": "62fba36b-4bd5-46be-8e8e-b20149db4e02",
+  "primary": {"mount": "/mnt/album-drive-1", "uuid": "d10eb869-4458-449e-880a-36ad70210d1d"},
+  "backup": {"mount": "/mnt/album-drive-3", "uuid": "f0b3d701-2343-46d2-b2b2-09791ba22b2d"},
+  "hostname": "basement.taila4bea8.ts.net",
+  "https_port": 8443,
+  "http_port": 8081,
+  "quota_gib": 1024,
+  "reserve_gib": 100,
+  "username": "owner"
+}

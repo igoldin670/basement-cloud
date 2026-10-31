@@ -1,0 +1,6 @@
+[project]
+name = "basement-cloud"
+version = "0.1.0"
+description = "Private Nextcloud storage with UUID-checked disks and encrypted versioned backups"
+requires-python = ">=3.12"
+dependencies = []

@@ -1,0 +1,7 @@
+{
+  "NEXTCLOUD_IMAGE": "nextcloud:34.0.5-fpm-alpine@sha256:ad705f2233b8f9cbe39ba36740208d58dbfa1d0d8c5e8a0087e637377d1abae2",
+  "NGINX_IMAGE": "nginx:stable-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949",
+  "POSTGRES_IMAGE": "postgres:17-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5",
+  "REDIS_IMAGE": "redis:7.4-bookworm@sha256:b6b6e3dc0c0952737748e55d5d885272840c7e42ba41ab1d5489f693419882f5",
+  "RESTIC_IMAGE": "restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510"
+}

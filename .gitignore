@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+*.dump
+*.log
+.cloud-state/
+.coverage
+integration-results.json
+secrets/
+*.key
+*.pem
